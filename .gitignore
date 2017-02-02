@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+test/
 env/
 build/
 develop-eggs/
@@ -87,3 +88,5 @@ ENV/
 
 # Rope project settings
 .ropeproject
+/.project
+/.pydevproject
