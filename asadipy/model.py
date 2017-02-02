@@ -67,37 +67,44 @@ class NATActor:
     def __init__(self, session):
         self.session = session
      
-    def __call__(self):
-        cli = 'show nat'
+    def Detail(self):
+        cli = 'show nat detail'
         nat = self.session.cli(cli)[cli]
         cur_config = None
-        cur_where = None
         cur_section = None
         result = []
         while nat:
             line = nat.pop(0)
-            kv = re.match('^(?P<config>\w+)\s+(?P<where>\w+)\s+Policies\s+\(Section\s+(?P<section>\d+)\)', line)
+            kv = re.match('^(?P<config>\w+)\s+NAT\s+Policies\s+\(Section\s+(?P<section>\d+)\)', line)
             if kv:
                 cur_config = kv.group('config')
-                cur_where = kv.group('where')
                 cur_section = kv.group('section')
                 continue
-            kv = re.match('^(?P<index>\d+)\s+\((?P<o_intf>\w+)\)\s+to\s+\((?P<t_intf>\w+)\)\s+source\s+(?P<mode>\w+)\s+(?P<o_src>[\W\w]+)\s+(?P<t_src>[\W\w]+)', line)
+            kv = re.match('^(?P<index>\d+)\s+\((?P<from>\w+)\)\s+to\s+\((?P<to>\w+)\)\s+source\s+(?P<mode>\w+)\s+(?P<o_net>[^\s]+)\s+(?P<t_net>[^\s]+)', line)
             if kv:
                 index = kv.group('index')
-                o_intf = kv.group('o_intf')
-                t_intf = kv.group('t_intf')
+                f = kv.group('from')
+                t = kv.group('to')
                 mode = kv.group('mode')
-                o_src = kv.group('o_src')
-                t_src = kv.group('t_src')
+                o_net = kv.group('o_net')
+                t_net = kv.group('t_net')
+                o_net = o_net if o_net not in ['any', 'interface'] else 'any'
+                t_net = t_net if t_net not in ['any', 'interface'] else 'any'
+                
                 kv = re.match('^\s+translate_hits\s+=\s+(?P<t_hits>\d+),\s+untranslate_hits\s+=\s+(?P<u_hits>\d+)', nat.pop(0))
                 t_hits = kv.group('t_hits') if kv else 0
                 u_hits = kv.group('u_hits') if kv else 0
+                
+                kv = re.match('^\s+Source\s+-\s+Origin:\s+(?P<o_addr>[^\s]+),\s+Translated:\s+(?P<t_addr>[^\s]+)', nat.pop(0))
+                o_addr = kv.group('o_addr') if kv else None
+                t_addr = kv.group('t_addr') if kv else None
+                
                 result.append({
-                    'config' : cur_config, 'where' : cur_where, 'section' : int(cur_section), 'index' : int(index), 'mode' : mode,
-                    'originalInterface' : o_intf, 'translatedInterface' : t_intf,
-                    'originalSource' : o_src, 'translatedSource' : t_src,
-                    'translateHits' : int(t_hits), 'untranslateHits' : int(u_hits)
+                    'config' : cur_config, 'section' : int(cur_section), 'index' : int(index), 'mode' : mode,
+                    'from' : f, 'to' : t,
+                    'originalNetwork' : o_net, 'translatedNetwork' : t_net,
+                    'originalAddress' : o_addr, 'translatedAddress' : t_addr,
+                    'translateHits' : int(t_hits), 'untranslateHits' : int(u_hits),
                 })
                 continue
         return result
@@ -122,7 +129,7 @@ class NATActor:
                     'allocCount' : int(kv.group('alloc'))
                 })
         return result
-
+    
 class Client(Session, dict):
     
     def __init__(self, ip, user, pwd, conns=1, conn_max=2, retry=3, debug=False, week=False):
@@ -154,6 +161,11 @@ class MultiDomain(dict):
         
         def __init__(self, multi_dom):
             MultiDomain.Actor.__init__(self, multi_dom, 'NAT')
+            
+        def Detail(self):
+            ret = {}
+            for dom_name in self.multi_dom: ret[dom_name] = self.multi_dom[dom_name].NAT.Detail()
+            return ret
         
         def Pool(self):
             ret = {}
