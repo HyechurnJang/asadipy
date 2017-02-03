@@ -66,6 +66,15 @@ class NATActor:
      
     def __init__(self, session):
         self.session = session
+        
+    def Count(self):
+        cli = 'show xlate count'
+        out = self.session.cli(cli)[cli]
+        for line in out:
+            kv = re.match('^(?P<in_use>\d+)\s+in use,\s+(?P<most_used>\d+)\s+most used', line)
+            if kv:
+                return {'in_use' : int(kv.group('in_use')), 'most_used' : int(kv.group('most_used'))}
+        return {'in_use' : 0, 'most_used' : 0}
      
     def Detail(self):
         cli = 'show nat detail'
@@ -129,7 +138,24 @@ class NATActor:
                     'allocCount' : int(kv.group('alloc'))
                 })
         return result
+
+class ConnActor:
     
+    def __init__(self, session):
+        self.session = session
+
+    def Count(self):
+        cli = 'show conn count'
+        out = self.session.cli(cli)[cli]
+        for line in out:
+            kv = re.match('^(?P<in_use>\d+)\s+in use,\s+(?P<most_used>\d+)\s+most used', line)
+            if kv:
+                return {'in_use' : int(kv.group('in_use')), 'most_used' : int(kv.group('most_used'))}
+        return {'in_use' : 0, 'most_used' : 0}
+
+    def All(self):
+        return self.session.get('monitoring/connections')
+
 class Client(Session, dict):
     
     def __init__(self, ip, user, pwd, conns=1, conn_max=2, retry=3, debug=False, week=False):
@@ -138,6 +164,7 @@ class Client(Session, dict):
         
         self.Stat = StatActor(self)
         self.NAT = NATActor(self)
+        self.Conn = ConnActor(self)
     
 class MultiDomain(dict):
     
@@ -161,6 +188,11 @@ class MultiDomain(dict):
         
         def __init__(self, multi_dom):
             MultiDomain.Actor.__init__(self, multi_dom, 'NAT')
+        
+        def Count(self):
+            ret = {}
+            for dom_name in self.multi_dom: ret[dom_name] = self.multi_dom[dom_name].NAT.Count()
+            return ret
             
         def Detail(self):
             ret = {}
@@ -172,6 +204,22 @@ class MultiDomain(dict):
             for dom_name in self.multi_dom: ret[dom_name] = self.multi_dom[dom_name].NAT.Pool()
             return ret
     
+    class ConnActor(Actor):
+        
+        def __init__(self, multi_dom):
+            MultiDomain.Actor.__init__(self, multi_dom, 'NAT')
+        
+        def Count(self):
+            ret = {}
+            for dom_name in self.multi_dom: ret[dom_name] = self.multi_dom[dom_name].Conn.Count()
+            return ret
+        
+        def All(self):
+            ret = {}
+            for dom_name in self.multi_dom: ret[dom_name] = self.multi_dom[dom_name].Conn.All()
+            return ret
+        
+    
     def __init__(self, conns=1, conn_max=2, retry=3, debug=False, week=False):
         dict.__init__(self)
         self.conns = conns
@@ -182,6 +230,7 @@ class MultiDomain(dict):
         
         self.Stat = MultiDomain.StatActor(self)
         self.NAT = MultiDomain.NATActor(self)
+        self.Conn = MultiDomain.ConnActor(self)
     
     def addDomain(self, domain_name, ip, user, pwd, conns=None, conn_max=None, retry=None, debug=None, week=None):
         if domain_name in self: return False
