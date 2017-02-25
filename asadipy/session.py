@@ -25,7 +25,7 @@ class Session:
         self.retry = retry
         self.debug = debug
         self.week = week
-        self.url = 'https://%s/api/' % ip
+        self.url = 'https://%s' % ip
         self.session = None
         self.token = None
         
@@ -38,7 +38,7 @@ class Session:
             self.session = requests.Session()
             self.session.mount('https://', requests.adapters.HTTPAdapter(pool_connections=self.conns, pool_maxsize=self.conn_max))
             for i in range(0, self.retry):
-                resp = self.session.post(self.url + 'tokenservices',
+                resp = self.session.post(self.url + '/api/tokenservices',
                                          headers=headers,
                                          data=json.dumps({}),
                                          auth=HTTPBasicAuth(self.user, self.pwd),
@@ -48,13 +48,13 @@ class Session:
                     if self.debug: print('Session %s with %s' % (self.url, self.token))
                     return
             raise AsadipySessionError()
-        except: raise AsadipySessionError()
+        except Exception as e: print str(e); raise AsadipySessionError()
     
     def refresh(self):
         headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'asadipy' }
         try:
             for i in range(0, self.retry):
-                resp = self.session.post(self.url + 'tokenservices',
+                resp = self.session.post(self.url + '/api/tokenservices',
                                          headers=headers,
                                          data=json.dumps({}),
                                          auth=HTTPBasicAuth(self.user, self.pwd),
@@ -74,14 +74,16 @@ class Session:
     def cli(self, *commands):
         headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'asadipy', 'X-Auth-Token' : self.token }
         for i in range(0, self.retry):
-            try: resp = self.session.post(self.url + 'cli', headers=headers, data=json.dumps({'commands' : commands}), verify=False)
+            try: resp = self.session.post(self.url + '/api/cli', headers=headers, data=json.dumps({'commands' : commands}), verify=False)
             except: time.sleep(0.5); continue
             if resp.status_code == 200:
                 data = resp.json()['response']
                 ret = {}
                 idx = 0
                 for command in commands:
-                    ret[command] = data[idx].split('\n')
+                    try: cdata = data[idx].split('\n')
+                    except: cdata = []
+                    ret[command] = cdata
                     idx += 1
                 return ret
             elif resp.status_code == 401: self.refresh()
@@ -106,6 +108,7 @@ class Session:
             while load != total:
                 print('Offset : {}, Load : {}, Total : {}'.format(offset, load, total))
                 resp = self.session.get(self.url + url + '?offset=%d' % offset, headers=headers, verify=False)
+                print resp.status_code
                 if resp.status_code == 200:
                     data = resp.json()
                     rinfo = data['rangeInfo']
@@ -114,6 +117,7 @@ class Session:
                     offset += 100
                     ret = ret + data['items']
                 elif resp.status_code == 401: self.refresh()
+                else: break
             print('CODE : {}\n{}'.format(resp.status_code, ret))
             return ret
         for i in range(0, self.retry):
