@@ -3,7 +3,7 @@ Cisco ASA Python API
 
 **ASA** **D**eveloping **I**nterface for **PY**thon
 
-version : 0.1.5
+version : 0.1.6
 
 last change : bug fix session refresh
 
