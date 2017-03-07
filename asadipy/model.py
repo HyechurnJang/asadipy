@@ -4,12 +4,10 @@ Created on 2017. 1. 26.
 @author: Hye-Churn Jang
 '''
 
-import gevent.monkey
-gevent.monkey.patch_socket()
-gevent.monkey.patch_ssl()
-
 import re
 import gevent
+
+from pygics import Task, RestAPI
 
 from .static import *
 from .session import Session
@@ -24,7 +22,7 @@ class ClientActor:
 class MultiDomActor:
     def __init__(self, multi_dom): self.multi_dom = multi_dom
     
-class Client(Session, dict):
+class Client(Session, dict, Task):
     
     class StatActor(ClientActor):
         
@@ -195,9 +193,17 @@ class Client(Session, dict):
                 if kv: return {'in_use' : int(kv.group('in_use')), 'most_used' : int(kv.group('most_used'))}
             return {'in_use' : 0, 'most_used' : 0}
     
-    def __init__(self, ip, user, pwd, conns=1, conn_max=2, retry=3, debug=False, week=False):
-        Session.__init__(self, ip, user, pwd, conns, conn_max, retry, debug, week)
-        dict.__init__(self, ip=ip, user=user, pwd=pwd, conns=conns, conn_max=conn_max)
+    def __init__(self, ip, user, pwd, refresh_sec=ASADIPY_REFRESH_SEC, **kargs):
+        Session.__init__(self,
+                         ip=ip,
+                         user=user,
+                         pwd=pwd,
+                         refresh_sec=refresh_sec,
+                         **kargs)
+        dict.__init__(self,
+                      ip=ip,
+                      user=user,
+                      pwd=pwd)
         
         self.Stat = Client.StatActor(self)
         self.Conn = Client.ConnActor(self)
@@ -308,13 +314,18 @@ class MultiDomain(dict):
             gevent.joinall(fetchs)
             return ret
     
-    def __init__(self, conns=1, conn_max=2, retry=3, debug=False, week=False):
+    def __init__(self,
+                 conns=RestAPI.DEFAULT_CONN_SIZE,
+                 conn_max=RestAPI.DEFAULT_CONN_MAX,
+                 retry=RestAPI.DEFAULT_CONN_RETRY,
+                 refresh_sec=ASADIPY_REFRESH_SEC,
+                 debug=False):
         dict.__init__(self)
         self.conns = conns
         self.conn_max = conn_max
         self.retry = retry
+        self.refresh_sec = refresh_sec
         self.debug = debug
-        self.week = week
         
         self.Stat = MultiDomain.StatActor(self)
         self.Conn = MultiDomain.ConnActor(self)
@@ -322,16 +333,22 @@ class MultiDomain(dict):
         self.ObjectGroup = MultiDomain.ObjectGroupActor(self)
         self.NAT = MultiDomain.NATActor(self)
     
-    def addDomain(self, domain_name, ip, user, pwd, conns=None, conn_max=None, retry=None, debug=None, week=None):
-        if domain_name in self: return False
-        opts = {'ip' : ip, 'user' : user, 'pwd' : pwd}
-        if conns != None: opts['conns'] = conns
-        if conn_max != None: opts['conn_max'] = conn_max
-        if retry != None: opts['retry'] = retry
-        if debug != None: opts['debug'] = debug
-        if week != None: opts['week'] = week
+    def addDomain(self, domain_name, ip, user, pwd):
+        if domain_name in self:
+            if self.debug: print('[Error]Asadipy:Multidomain:AddDomain:Already Exist Domain %s' % domain_name)
+            return False
+        opts = {'ip' : ip,
+                'user' : user,
+                'pwd' : pwd,
+                'conns' : self.conns,
+                'conn_max' : self.conn_max,
+                'retry' : self.retry,
+                'refresh_sec' : self.refresh_sec,
+                'debug' : self.debug}
         try: clnt = Client(**opts)
-        except: return False
+        except Exception as e:
+            if self.debug: print('[Error]Asadipy:Multidomain:AddDomain:%s' % str(e))
+            return False
         self[domain_name] = clnt
         return True
     

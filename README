@@ -1,2 +1,12 @@
 asadipy
-Cisco ASA Python API
+
+Cisco ASA Python API : ASA Developing Interface for PYthon
+
+1. Install
+
+	1.1 From GIT
+		$ python setup.py build
+		$ python setup.py install
+
+	1.2 From PIP
+		$ pip install asadipy
