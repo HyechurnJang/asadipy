@@ -5,7 +5,7 @@ Cisco ASA Python API
 
 version : 0.1.5
 
-last change : PyPI Release 0.1.5
+last change : bug fix session refresh
 
 ## Install
 

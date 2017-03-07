@@ -28,7 +28,7 @@ class Session(RestAPI):
         raise ExceptAsadipySession(self)
     
     def __refresh__(self, req):
-        return self.__login__(self, req)
+        return self.__login__(req)
     
     def __header__(self): return {'Content-Type' : 'application/json', 'Accept' : 'application/json', 'User-Agent' : 'asadipy', 'X-Auth-Token' : self.token }
     
