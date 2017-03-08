@@ -325,7 +325,7 @@ class MultiDomain(dict):
                  retry=RestAPI.DEFAULT_CONN_RETRY,
                  refresh_sec=ASADIPY_REFRESH_SEC,
                  debug=False):
-        dict.__init__(self, conns=conns, conn_max=conn_max, retry=retry, refresh_sec=refresh_sec, debug=debug)
+        dict.__init__(self)
         self.conns = conns
         self.conn_max = conn_max
         self.retry = retry
