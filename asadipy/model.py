@@ -203,7 +203,12 @@ class Client(Session, dict, Task):
         dict.__init__(self,
                       ip=ip,
                       user=user,
-                      pwd=pwd)
+                      pwd=pwd,
+                      conns=self.conns,
+                      conn_max=self.conn_max,
+                      retry=self.retry,
+                      refresh_sec=self.refresh_sec,
+                      debug=self.debug)
         
         self.Stat = Client.StatActor(self)
         self.Conn = Client.ConnActor(self)
@@ -320,7 +325,7 @@ class MultiDomain(dict):
                  retry=RestAPI.DEFAULT_CONN_RETRY,
                  refresh_sec=ASADIPY_REFRESH_SEC,
                  debug=False):
-        dict.__init__(self)
+        dict.__init__(self, conns=conns, conn_max=conn_max, retry=retry, refresh_sec=refresh_sec, debug=debug)
         self.conns = conns
         self.conn_max = conn_max
         self.retry = retry
